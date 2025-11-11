@@ -15,6 +15,7 @@ import (
 const (
 	reparseTagMountPoint = 0xA0000003
 	reparseTagSymlink    = 0xA000000C
+	reparseTagLxSymlink  = 0xA000001D // WSL/MSYS2 native symlinks
 )
 
 type reparseDataBuffer struct {
@@ -31,6 +32,7 @@ type reparseDataBuffer struct {
 type ReparsePoint struct {
 	Target       string
 	IsMountPoint bool
+	IsLxSymlink  bool // True if this is an LX symlink (WSL/MSYS2 native)
 }
 
 // UnsupportedReparsePointError is returned when trying to decode a non-symlink or
@@ -56,6 +58,20 @@ func DecodeReparsePointData(tag uint32, b []byte) (*ReparsePoint, error) {
 	case reparseTagMountPoint:
 		isMountPoint = true
 	case reparseTagSymlink:
+	case reparseTagLxSymlink:
+		// LX symlinks store the target as UTF-8 after a 4-byte version field
+		if len(b) < 4 {
+			return nil, fmt.Errorf("LX symlink buffer too short")
+		}
+		targetBytes := b[4:]
+		for i, c := range targetBytes {
+			if c == 0 {
+				targetBytes = targetBytes[:i]
+				break
+			}
+		}
+		target := string(targetBytes)
+		return &ReparsePoint{Target: target, IsMountPoint: false, IsLxSymlink: true}, nil
 	default:
 		return nil, &UnsupportedReparsePointError{tag}
 	}
@@ -69,16 +85,31 @@ func DecodeReparsePointData(tag uint32, b []byte) (*ReparsePoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ReparsePoint{string(utf16.Decode(name)), isMountPoint}, nil
+	return &ReparsePoint{string(utf16.Decode(name)), isMountPoint, false}, nil
 }
 
 func isDriveLetter(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
-// EncodeReparsePoint encodes a Win32 REPARSE_DATA_BUFFER structure describing a symlink or
-// mount point.
+// EncodeReparsePoint encodes a Win32 REPARSE_DATA_BUFFER structure describing a symlink,
+// mount point, or LX symlink.
 func EncodeReparsePoint(rp *ReparsePoint) []byte {
+	if rp.IsLxSymlink {
+		// LX symlink: 4-byte version + UTF-8 target
+		version := uint32(2)
+		targetBytes := []byte(rp.Target)
+		dataLength := 4 + len(targetBytes)
+
+		var b bytes.Buffer
+		_ = binary.Write(&b, binary.LittleEndian, uint32(reparseTagLxSymlink))
+		_ = binary.Write(&b, binary.LittleEndian, uint16(dataLength))
+		_ = binary.Write(&b, binary.LittleEndian, uint16(0))
+		_ = binary.Write(&b, binary.LittleEndian, version)
+		_, _ = b.Write(targetBytes)
+		return b.Bytes()
+	}
+
 	// Generate an NT path and determine if this is a relative path.
 	var ntTarget string
 	relative := false
