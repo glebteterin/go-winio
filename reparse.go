@@ -1,11 +1,11 @@
 //go:build windows
-// +build windows
 
 package winio
 
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf16"
@@ -61,7 +61,7 @@ func DecodeReparsePointData(tag uint32, b []byte) (*ReparsePoint, error) {
 	case reparseTagLxSymlink:
 		// LX symlinks store the target as UTF-8 after a 4-byte version field
 		if len(b) < 4 {
-			return nil, fmt.Errorf("LX symlink buffer too short")
+			return nil, errors.New("LX symlink buffer too short")
 		}
 		targetBytes := b[4:]
 		for i, c := range targetBytes {

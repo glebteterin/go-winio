@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 package winio
 
@@ -10,14 +9,14 @@ import (
 func TestLxSymlinkRoundTrip(t *testing.T) {
 	// Test LX symlink encode/decode
 	original := &ReparsePoint{
-		Target:      "/usr/bin/bash",
+		Target:       "/usr/bin/bash",
 		IsMountPoint: false,
 		IsLxSymlink:  true,
 	}
 
 	// Encode
 	encoded := EncodeReparsePoint(original)
-	
+
 	// Decode
 	decoded, err := DecodeReparsePoint(encoded)
 	if err != nil {
@@ -39,14 +38,14 @@ func TestLxSymlinkRoundTrip(t *testing.T) {
 func TestWindowsSymlinkNotLx(t *testing.T) {
 	// Test that regular Windows symlinks are not marked as LX
 	original := &ReparsePoint{
-		Target:      `C:\Windows\System32`,
+		Target:       `C:\Windows\System32`,
 		IsMountPoint: false,
 		IsLxSymlink:  false,
 	}
 
 	// Encode
 	encoded := EncodeReparsePoint(original)
-	
+
 	// Decode
 	decoded, err := DecodeReparsePoint(encoded)
 	if err != nil {
