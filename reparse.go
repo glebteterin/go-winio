@@ -124,7 +124,6 @@ func encodeLxReparsePoint(rp *ReparsePoint) []byte {
 }
 
 func encodeWindowsReparsePoint(rp *ReparsePoint) []byte {
-
 	// Generate an NT path and determine if this is a relative path.
 	var ntTarget string
 	relative := false
