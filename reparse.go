@@ -16,6 +16,8 @@ const (
 	reparseTagMountPoint = 0xA0000003
 	reparseTagSymlink    = 0xA000000C
 	reparseTagLxSymlink  = 0xA000001D // WSL/MSYS2 native symlinks
+
+	lxSymlinkVersion = 2 // LX symlink format version
 )
 
 type reparseDataBuffer struct {
@@ -102,6 +104,9 @@ func isDriveLetter(c byte) bool {
 // EncodeReparsePoint encodes a Win32 REPARSE_DATA_BUFFER structure describing a symlink,
 // mount point, or LX symlink.
 func EncodeReparsePoint(rp *ReparsePoint) []byte {
+	if rp == nil {
+		return nil
+	}
 	if rp.IsLxSymlink {
 		return encodeLxReparsePoint(rp)
 	}
@@ -110,7 +115,6 @@ func EncodeReparsePoint(rp *ReparsePoint) []byte {
 
 func encodeLxReparsePoint(rp *ReparsePoint) []byte {
 	// LX symlink: 4-byte version + UTF-8 target
-	version := uint32(2)
 	targetBytes := []byte(rp.Target)
 	dataLength := 4 + len(targetBytes)
 
@@ -118,7 +122,7 @@ func encodeLxReparsePoint(rp *ReparsePoint) []byte {
 	_ = binary.Write(&b, binary.LittleEndian, uint32(reparseTagLxSymlink))
 	_ = binary.Write(&b, binary.LittleEndian, uint16(dataLength))
 	_ = binary.Write(&b, binary.LittleEndian, uint16(0))
-	_ = binary.Write(&b, binary.LittleEndian, version)
+	_ = binary.Write(&b, binary.LittleEndian, uint32(lxSymlinkVersion))
 	_, _ = b.Write(targetBytes)
 	return b.Bytes()
 }
